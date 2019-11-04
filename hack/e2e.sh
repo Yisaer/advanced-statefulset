@@ -10,6 +10,7 @@ cd $ROOT
 source "${ROOT}/hack/lib.sh"
 
 KEEP_CLUSTER=${KEEP_CLUSTER:-}
+SKIP_BUILD=${SKIP_BUILD:-}
 REUSE_CLUSTER=${REUSE_CLUSTER:-}
 
 hack::ensure_kind
@@ -45,6 +46,20 @@ fi
 export KUBECONFIG="$($KIND_BIN get kubeconfig-path --name="$CLUSTER")"
 $KUBECTL_BIN cluster-info
 
+export CONTROLLER_IMAGE=quay.io/cofyc/advanced-statefulset:latest
+
+if [ -z "$SKIP_BUILD" ]; then
+	echo "info: building image $CONTROLLER_IMAGE"
+	docker build -t $CONTROLLER_IMAGE .
+else
+	echo "info: skip building images"
+fi
+
+echo "info: loading image $CONTROLLER_IMAGE"
+$KIND_BIN load docker-image --name $CLUSTER $CONTROLLER_IMAGE
+
 hack/run-e2e.sh --kubectl-path=$KUBECTL_BIN \
-    --ginkgo.focus='\[sig-apps\]\sStatefulSet\s' \
+	--provider=skeleton \
+	--clean-start=true \
+	--repo-root=$ROOT \
     "$@"
